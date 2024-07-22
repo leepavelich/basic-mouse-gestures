@@ -85,12 +85,11 @@ function findAnchorTag(element) {
 }
 
 document.addEventListener('contextmenu', (e) => {
-  console.log({ gestureInProgress })
-  if (!gestureInProgress) {
-    console.log("not prevented")
+  const modifierKeyPressed = e.metaKey || e.ctrlKey;
+
+  if (!gestureInProgress || modifierKeyPressed) {
     return;
   }
 
   e.preventDefault();
-  console.log("prevented")
 });
