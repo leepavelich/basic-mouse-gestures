@@ -73,7 +73,7 @@ document.addEventListener('mousedown', (e) => {
         e.target.dispatchEvent(newContextMenuEvent);
         e.stopPropagation();
       }
-    }, 200);
+    }, 40);
   }
 });
 
