@@ -4,6 +4,7 @@ function createTrail() {
   trail.style.top = '0';
   trail.style.left = '0';
   trail.style.zIndex = '9999';
+  trail.style.pointerEvents = 'none';
   trail.width = window.innerWidth;
   trail.height = window.innerHeight;
   const ctx = trail.getContext('2d');
