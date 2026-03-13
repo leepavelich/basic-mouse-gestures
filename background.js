@@ -1,15 +1,22 @@
 const Errors = {
+  NOT_FOUND_PREVIOUS_PAGE: 'Cannot find a previous page in history.',
   NOT_FOUND_NEXT_PAGE: "Cannot find a next page in history.",
 };
 
-const forwardErrHandler = (error) => {
-  if (error.message === Errors.NOT_FOUND_NEXT_PAGE) return
-  console.error(`Error performing 'right' gesture: ${error.message}`);
-}
+const historyErrHandler = (error, gestureName) => {
+  if (
+    error.message === Errors.NOT_FOUND_PREVIOUS_PAGE ||
+    error.message === Errors.NOT_FOUND_NEXT_PAGE
+  ) {
+    return;
+  }
+
+  console.error(`Error performing '${gestureName}' gesture: ${error.message}`);
+};
 
 const gestureActions = {
-  'left': (sender) => chrome.tabs.goBack(sender.tab.id),
-  'right': (sender) => chrome.tabs.goForward(sender.tab.id).catch(forwardErrHandler),
+  'left': (sender) => chrome.tabs.goBack(sender.tab.id).catch((error) => historyErrHandler(error, 'left')),
+  'right': (sender) => chrome.tabs.goForward(sender.tab.id).catch((error) => historyErrHandler(error, 'right')),
   'up': (_sender, link) => chrome.tabs.create({ url: link || 'chrome://newtab/', active: true }),
   'down': (_sender, link) => {
     chrome.tabs.query({ currentWindow: true, active: true }, (tabs) => {
@@ -20,7 +27,7 @@ const gestureActions = {
 };
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action !== 'performGesture') return
+  if (request.action !== 'performGesture') return;
 
   const action = gestureActions[request.gesture];
   if (action) action(sender, request.link);
