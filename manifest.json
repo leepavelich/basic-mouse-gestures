@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Basic Mouse Gestures",
-  "version": "1.0",
+  "version": "2.0",
   "description": "A simple mouse gesture extension for Chrome.",
   "permissions": ["tabs", "activeTab"],
   "background": {
