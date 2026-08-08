@@ -11,10 +11,18 @@ let activeCtx = null;
 let activeMoveHandler = null;
 let activeUpHandler = null;
 let activeBlurHandler = null;
-const minDistance = 20;
+const minDistance = 16;
 const turnDistance = 12;
-const axisHysteresis = 4;
+const dominanceRatio = 1.5; // winning axis must beat the other by 50%
 let allowNativeMenuByModifier = false; // set when Cmd/Ctrl was held at mousedown
+
+// macOS fires contextmenu on mousedown, before any drag exists, so the menu
+// can't be gated on whether a gesture happened. Windows/Linux fire it after
+// mouseup, where it can.
+const isMac = /Mac/.test(navigator.platform) || /Macintosh/.test(navigator.userAgent);
+let suppressMenuUntil = 0;    // Windows/Linux: eat the contextmenu that follows a gesture
+let lastPlainRightClick = 0;  // macOS: when a right-click ended without movement
+const menuSecondClickMs = 500;
 
 function isEditable(el) {
   if (!el) return false;
@@ -49,15 +57,15 @@ function getDominantDirection(dx, dy) {
   const absDx = Math.abs(dx);
   const absDy = Math.abs(dy);
 
-  if (absDx >= absDy + axisHysteresis) {
+  if (absDx > absDy * dominanceRatio) {
     return dx > 0 ? 'right' : 'left';
   }
 
-  if (absDy >= absDx + axisHysteresis) {
+  if (absDy > absDx * dominanceRatio) {
     return dy > 0 ? 'down' : 'up';
   }
 
-  return null;
+  return null; // too diagonal to call; keep accumulating
 }
 
 document.addEventListener('mousedown', (e) => {
@@ -124,10 +132,16 @@ document.addEventListener('mousedown', (e) => {
 
   const upHandler = () => {
     if (hasMoved) {
+      // A gesture just happened; on Windows/Linux the contextmenu event is
+      // about to fire, so flag it for suppression
+      suppressMenuUntil = performance.now() + 300;
       const gestureStr = gesture.join('-');
-      if (chrome.runtime && chrome.runtime.sendMessage) {
+      if (gestureStr && chrome.runtime && chrome.runtime.sendMessage) {
         chrome.runtime.sendMessage({ action: 'performGesture', gesture: gestureStr, link: initialTarget?.href || null });
       }
+    } else if (isMac) {
+      // Right-click with no movement: arm the second-click menu passthrough
+      lastPlainRightClick = performance.now();
     }
 
     cleanupGesture();
@@ -155,8 +169,25 @@ document.addEventListener('contextmenu', (e) => {
     return;
   }
 
-  // Default RMB is for gestures: suppress the native menu when in RMB flow
-  if (gestureInProgress || hasMoved) {
+  if (isMac) {
+    // This event fired at mousedown, so we can't yet know whether the click
+    // will become a gesture. A second right-click shortly after a plain one
+    // opens the menu; anything else is treated as a (potential) gesture.
+    if (performance.now() - lastPlainRightClick < menuSecondClickMs) {
+      lastPlainRightClick = 0;
+      cleanupGesture(); // the menu is opening; don't leave a gesture armed
+      return;
+    }
+    if (gestureInProgress || hasMoved) {
+      e.preventDefault();
+    }
+    return;
+  }
+
+  // Windows/Linux: this event fired after mouseup, so by now we know whether
+  // a gesture happened. Plain clicks get the native menu.
+  if (performance.now() < suppressMenuUntil) {
+    suppressMenuUntil = 0;
     e.preventDefault();
   }
 });
